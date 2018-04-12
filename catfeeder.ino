@@ -1,86 +1,80 @@
-//------------------
-//- Çat Feeder 1.0 -
-//- www.firediy.fr -
-//------------------
 /**
- * Le TC4429 est un driver INVERSEUR. Le moteur tournera donc à l'inverse du rapport cyclique.
- * 255 => le moteur ne tourne pas
- * 0   => le moteur tourne à plein régime
+ * Cat-feeder V2
+ *
+ * @author lobodol <grobodol@gmail.com>
  */
 
-// Déclaration des variables globales
-int pinMot               = 5;     // Broche de sortie du signal de contrôle moteur
-int bp                   = 2;     // Broche d'entrée du bouton poussoir
-int duty                 = 0;     // Rapport cyclique du signal de contrôle du moteur
-int duree                = 7;     // Nombre de sec pendant lesquelles le moteur va tourner pour une distribution : à adapter selon la longueur du tube et la vitesse de rotation du moteur
-unsigned long dureeCycle = 14400; // Nombre de sec séparant 2 distributions, équivaut ici à 4h
+#include <Servo.h>
 
+#define STOP     90
+#define BACKWARD 0
+#define FORWARD  180
 
-/**
- * Fonction d'initialisation
- */
-void setup(void)
-{
-    pinMode(bp, INPUT);
-
-    // L'interruption int.0 écoute la broche 2 de l'Arduino Uno
-    // Déclenche une interruption lorsque le signal bp est à l'état BAS (bouton poussoir appuyé)
-    attachInterrupt(0, startMoteur, LOW);
-
-    // Initialise la commande moteur
-    analogWrite(pinMot, 255);
-}
-
+Servo motor;
+int           servo_pin       = 5;
+int           push_button_pin = 2;
+unsigned long cycle_duration  = 4 * 60 *60 * 1000; // Cycle duration in ms (4h).
+unsigned long timer           = 0;
 
 /**
- * Boucle principale
+ * Setup routine
  */
-void loop()
-{
-    // Attente jusqu'au prochain cycle de distribution (ici 4h)
-    attendre(dureeCycle);
-    actionnerMoteur();
+void setup() {
+    pinMode(push_button_pin, INPUT);
+    motor.attach(servo_pin);
+    attachInterrupt(digitalPinToInterrupt(push_button_pin), manualDistribution, LOW);
+
+    // Make sure servo is stopped
+    motor.write(STOP);
 }
 
 /**
- * Fait tourner le moteur pendant 'duree' millisecondes
+ * Main loop
  */
-void actionnerMoteur()
-{
-    analogWrite(pinMot, duty);
-    attendre(duree);
-    digitalWrite(pinMot, HIGH);
+void loop() {
+    timer = millis();
+
+    if (timer >= cycle_duration) {
+        // Reset timer
+        timer = 0;
+
+        runDistribution();
+    }
+
 }
 
 /**
- * Actionne le moteur et l'arrête si le bouton poussoir est relâché
+ * Makes servo turn for 8.4s. To prevent  pet-food to block the screw,
+ * make the servo run counterclockwise every 2s for 0.6s.
  */
-void startMoteur()
-{
-    analogWrite(pinMot, duty);
+void runDistribution() {
+    for (int i = 0; i < 3; i++) {
+        // Each loop takes 2.8s
+        motor.write(FORWARD);
+        delay(2000);
 
-    // Si on arrête d'appuyer sur le bouton
-    if (digitalRead(bp) == HIGH) {
-        digitalWrite(pinMot, HIGH);
+        // Stopping servo is necessary before changing rotation way. Otherwise it simply stops turning.
+        motor.write(STOP);
+        delay(100);
+
+        motor.write(BACKWARD);
+        delay(600);
+
+        // Stopping servo is necessary before changing rotation way. Otherwise it simply stops turning.
+        motor.write(STOP);
+        delay(100);
     }
 }
 
 /**
- * Attendre n secondes
- * @param unsigned long duree : nombre de secondes à attendre
- * @return void
+ * Makes turn the servo until push button is released.
+ * Used for manual distribution.
  */
-void attendre(int duree)
-{
-    int loops;
-    int count = 30;
-    int reste = (duree%count);
-    
-    loops = floor(duree/count);
-
-    for (int i=0; i < loops; i++) {
-       delay(count*1000); 
+void manualDistribution() {
+    // If push button is released, stop the servo
+    if (digitalRead(push_button_pin, HIGH)) {
+        motor.write(STOP);
+    } else {
+        runDistribution();
     }
-
-    delay(reste*1000);
 }
