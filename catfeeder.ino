@@ -129,9 +129,3 @@ bool isButtonPressed()
 {
     return digitalRead(button_pin) == LOW;
 }
-
-
-
-
-
-
