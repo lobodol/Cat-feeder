@@ -56,7 +56,7 @@ void loop() {
  */
 void feed(unsigned int duration)
 {
-    unsigned long start = millis();
+    unsigned long start = millis(); // When feeding process started.
     unsigned long now;
 
     // Casting (millis() - start) is to handle millis()'s overflow after 50 days.
@@ -64,9 +64,10 @@ void feed(unsigned int duration)
         feedCycle(start, now);
     }
 
+    // Just make sure to stop the motor when button is released.
     motor.write(STOP);
 
-    // Reset loop timer
+    // Reset loop timer.
     loop_timer = millis();
 }
 
@@ -77,7 +78,7 @@ void feed(unsigned int duration)
  */
 void manualFeed()
 {
-    unsigned long start = millis();
+    unsigned long start = millis(); // When feeding process started.
 
     while(isButtonPressed()) {
         feedCycle(start, millis());
