@@ -12,7 +12,7 @@
 #define STOP          90
 #define BACKWARD      0
 #define FEED_DURATION 7000 // Duration of feeding in ms
-#define FEED_CYCLE    0.002    // Feed every 4 hours
+#define FEED_CYCLE    4    // Feed every 4 hours
 //----------------------------------------------------------------------------------------------------------------------
 Servo motor;
 byte button_pin = 2;
