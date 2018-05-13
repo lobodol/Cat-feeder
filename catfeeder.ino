@@ -1,30 +1,37 @@
 /**
- * Cat-feeder V2
+ * Pet feeder V2. This Arduino sketch is provided "as is" without any guaranty.
+ * Feel free to edit according to your needs.
  *
  * @author lobodol <grobodol@gmail.com>
+ * @licence MIT
  */
 
 #include <Servo.h>
-
-#define STOP     90
-#define BACKWARD 0
-#define FORWARD  180
-
+//----------------------------------------------------------------------------------------------------------------------
+#define FORWARD       180
+#define STOP          90
+#define BACKWARD      0
+#define FEED_DURATION 7000 // Duration of feeding in ms
+#define FEED_CYCLE    0.002    // Feed every 4 hours
+//----------------------------------------------------------------------------------------------------------------------
 Servo motor;
-int           servo_pin       = 5;
-int           push_button_pin = 2;
-unsigned long cycle_duration  = 4 * 60 *60 * 1000; // Cycle duration in ms (4h).
-unsigned long timer           = 0;
-
+byte button_pin = 2;
+byte motor_pin  = 3;
+unsigned long loop_timer;
+//----------------------------------------------------------------------------------------------------------------------
 /**
  * Setup routine
  */
 void setup() {
-    pinMode(push_button_pin, INPUT);
-    motor.attach(servo_pin);
-    attachInterrupt(digitalPinToInterrupt(push_button_pin), manualDistribution, LOW);
+    Serial.begin(9600);
 
-    // Make sure servo is stopped
+    // Initialize loop timer.
+    loop_timer = millis();
+
+    motor.attach(motor_pin);
+    pinMode(button_pin, INPUT_PULLUP);
+
+    // Initialize motor's speed.
     motor.write(STOP);
 }
 
@@ -32,49 +39,99 @@ void setup() {
  * Main loop
  */
 void loop() {
-    timer = millis();
-
-    if (timer >= cycle_duration) {
-        // Reset timer
-        timer = 0;
-
-        runDistribution();
+    if (isButtonPressed()) {
+        manualFeed();
     }
 
+    if (isFeedTime()) {
+        feed(FEED_DURATION);
+    }
 }
 
 /**
- * Makes servo turn for 8.4s. To prevent  pet-food to block the screw,
- * make the servo run counterclockwise every 2s for 0.6s.
+ * Feed for given duration
+ *
+ * @param unsigned int duration : Duration in ms (max 65535ms)
+ * @return void
  */
-void runDistribution() {
-    for (int i = 0; i < 3; i++) {
-        // Each loop takes 2.8s
+void feed(unsigned int duration)
+{
+    unsigned long start = millis();
+    unsigned long now;
+
+    // Casting (millis() - start) is to handle millis()'s overflow after 50 days.
+    while((unsigned long)((now = millis()) - start) < duration) {
+        feedCycle(start, now);
+    }
+
+    motor.write(STOP);
+
+    // Reset loop timer
+    loop_timer = millis();
+}
+
+/**
+ * Trigger manual feeding while button is pressed.
+ *
+ * @return void
+ */
+void manualFeed()
+{
+    unsigned long start = millis();
+
+    while(isButtonPressed()) {
+        feedCycle(start, millis());
+    }
+
+    motor.write(STOP);
+}
+
+/**
+ * Run part of a cycle depending on when it started and current time.
+ *
+ * A cycle is composed of 2s FORWARD + 0.1s STOP + 0.5s BACKWARD + 0.1s STOP.
+ * A cycle is then 2.7s long.
+ *
+ * @param unsigned long start : Time when feed cycle started
+ * @param unsigned long now   : Current time
+ */
+void feedCycle(unsigned long start, unsigned long now)
+{
+    int   cycle    = 2700; // Duration of a full cycle in ms
+    float position = (now - start) % cycle;
+
+    if (position < 2000) {
         motor.write(FORWARD);
-        delay(2000);
-
-        // Stopping servo is necessary before changing rotation way. Otherwise it simply stops turning.
-        motor.write(STOP);
-        delay(100);
-
-        motor.write(BACKWARD);
-        delay(600);
-
-        // Stopping servo is necessary before changing rotation way. Otherwise it simply stops turning.
-        motor.write(STOP);
-        delay(100);
-    }
-}
-
-/**
- * Makes turn the servo until push button is released.
- * Used for manual distribution.
- */
-void manualDistribution() {
-    // If push button is released, stop the servo
-    if (digitalRead(push_button_pin, HIGH)) {
+    } else if (position < 2100 || position > 2600) {
         motor.write(STOP);
     } else {
-        runDistribution();
+        motor.write(BACKWARD);
     }
 }
+
+/**
+ * Return TRUE if it's feed time, FALSE otherwise.
+ *
+ * @return bool
+ */
+bool isFeedTime()
+{
+    // Casting (millis() - loop_timer) is to handle millis()'s overflow after 50 days.
+    return (unsigned long)(millis() - loop_timer) >= (unsigned long)(FEED_CYCLE * 60 * 60 * 1000);
+}
+
+/**
+ * Return whether the push button is pressed.
+ *
+ * @return bool
+ */
+bool isButtonPressed()
+{
+    return digitalRead(button_pin) == LOW;
+}
+
+
+
+
+
+
